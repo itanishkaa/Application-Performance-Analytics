@@ -34,4 +34,9 @@ class IncidentDetectRequest(BaseModel):
 
 class IncidentDetectResponse(BaseModel):
     incidents_created: int
+    incidents_already_open: int
     incidents: List[IncidentOut]
+
+
+class IncidentStatusUpdate(BaseModel):
+    status: str  # acknowledged | resolved

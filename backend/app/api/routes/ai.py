@@ -11,6 +11,8 @@ from app.schemas.ai import (
     AiChatResponse,
     AiIncidentAnalyzeRequest,
     AiIncidentAnalyzeResponse,
+    AiServiceAnalyzeRequest,
+    AiServiceAnalyzeResponse,
     AiSummaryRequest,
     AiSummaryResponse,
 )
@@ -70,19 +72,64 @@ def ai_analyze_incident(
     return {**result, "model": settings.OLLAMA_MODEL}
 
 
+@router.post("/analyze-service", response_model=AiServiceAnalyzeResponse)
+def ai_analyze_service(
+    payload: AiServiceAnalyzeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Service Details page's "Analyze with AI" button — flags potential
+    issues for a service from its current metrics, without needing a
+    formal Incident record to already exist."""
+    df = load_logs_df(db)
+    service_df = analytics_service.apply_filters(df, service=payload.service)
+    if len(service_df) == 0:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    kpis = analytics_service.calculate_kpis(service_df)
+    releases = analytics_service.analyze_release_performance(service_df)
+    context = {
+        "service": payload.service,
+        "current_metrics": kpis,
+        "release_performance": releases.to_dict(orient="records"),
+        "regression_check": analytics_service.detect_regressions(
+            releases, sorted(releases["release_version"].tolist())
+        ).to_dict(orient="records"),
+    }
+
+    try:
+        result = ai_client.generate_service_analysis(context)
+    except ai_client.AiUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {**result, "model": settings.OLLAMA_MODEL}
+
+
 @router.post("/chat", response_model=AiChatResponse)
 def ai_chat(
     payload: AiChatRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # V1: always ground the chat in the overall KPI snapshot plus top
-    # services/releases. A future version could route the question to a
-    # narrower context (e.g. detect "which endpoint" -> endpoint table).
+    # Grounded in enough breakdowns to answer the suggested questions on the
+    # AI page (slowest endpoint, highest error-rate service, worst region,
+    # etc.) — not just the overall KPI snapshot.
     df = load_logs_df(db)
+    per_service = {
+        name: analytics_service.calculate_kpis(group) for name, group in df.groupby("service_name")
+    }
     context = {
         "overview": analytics_service.calculate_kpis(df),
-        "top_releases": analytics_service.analyze_release_performance(df).to_dict(orient="records"),
+        "services": [
+            {"service_name": name, **metrics} for name, metrics in per_service.items()
+        ],
+        "slowest_endpoints": (
+            analytics_service.analyze_endpoint_performance(df)
+            .sort_values("p95_latency_ms", ascending=False)
+            .head(10)
+            .to_dict(orient="records")
+        ),
+        "releases": analytics_service.analyze_release_performance(df).to_dict(orient="records"),
         "regions": analytics_service.analyze_region_performance(df).to_dict(orient="records"),
     }
 

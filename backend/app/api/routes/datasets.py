@@ -92,16 +92,40 @@ def upload_dataset(
 
 @router.post("/load-sample")
 def load_sample_dataset(
+    force: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Convenience endpoint for local dev: ingest the bundled sample CSV
     at data/raw/api_logs_uncleaned.csv (settings.DEFAULT_RAW_CSV_PATH)
-    without needing to upload it through the UI."""
+    without needing to upload it through the UI.
+
+    Idempotent by default: if the sample was already loaded, this returns
+    the existing dataset instead of inserting another copy of the same
+    rows. Pass ?force=true to insert a fresh copy anyway (e.g. after
+    regenerating the CSV with different data).
+    """
     backend_dir = Path(__file__).resolve().parents[3]
     csv_path = (backend_dir / settings.DEFAULT_RAW_CSV_PATH).resolve()
     if not csv_path.exists():
         raise HTTPException(status_code=404, detail=f"Sample CSV not found at {csv_path}")
+
+    if not force:
+        existing = db.scalar(
+            select(Dataset).where(Dataset.file_name == csv_path.name).order_by(Dataset.created_at.desc())
+        )
+        if existing:
+            return {
+                "dataset_id": existing.id,
+                "already_loaded": True,
+                "clean_rows": existing.row_count,
+                "message": (
+                    "Sample dataset was already loaded — returning the existing "
+                    "dataset instead of inserting duplicate rows. Pass "
+                    "?force=true to load another copy anyway, or DELETE the "
+                    "existing dataset first."
+                ),
+            }
 
     dataset = Dataset(name="Sample synthetic dataset", file_name=csv_path.name)
     raw_df = read_raw_csv(str(csv_path))
@@ -110,9 +134,41 @@ def load_sample_dataset(
 
     return {
         "dataset_id": dataset.id,
+        "already_loaded": False,
         "raw_rows": report.raw_rows,
         "clean_rows": report.clean_rows,
         "dropped_invalid_status": report.dropped_invalid_status,
         "dropped_invalid_latency": report.dropped_invalid_latency,
         "duplicates_removed": report.duplicates_removed,
     }
+
+
+@router.delete("/{dataset_id}")
+def delete_dataset(
+    dataset_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a dataset and all of its log rows."""
+    dataset = db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    db.query(ApiLog).filter(ApiLog.dataset_id == dataset_id).delete()
+    db.delete(dataset)
+    db.commit()
+    return {"deleted": True, "dataset_id": dataset_id}
+
+
+@router.post("/reset")
+def reset_all_data(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dev/demo convenience: wipe every dataset and log row so you can
+    start clean. Use this once to clear out duplicate rows accumulated
+    from repeated /load-sample calls before the idempotency fix."""
+    logs_deleted = db.query(ApiLog).delete()
+    datasets_deleted = db.query(Dataset).delete()
+    db.commit()
+    return {"logs_deleted": logs_deleted, "datasets_deleted": datasets_deleted}

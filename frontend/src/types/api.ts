@@ -29,6 +29,22 @@ export interface ServiceSummary {
   avg_latency_ms: number;
   p95_latency_ms: number;
   error_rate_percent: number;
+  availability_percent: number;
+}
+
+export interface ServiceDetail extends ServiceSummary {
+  p99_latency_ms: number;
+  endpoints: string[];
+  releases: string[];
+  regions: string[];
+  latency_trend: LatencyTrendPoint[] | null;
+  error_trend: unknown[] | null;
+}
+
+export interface ServicePerformance {
+  endpoints: EndpointSummary[];
+  releases: ReleasePerformance[];
+  regions: RegionPerformance[];
 }
 
 export interface EndpointSummary {
@@ -40,6 +56,18 @@ export interface EndpointSummary {
   p99_latency_ms: number;
   error_rate_percent: number;
   status: "Healthy" | "Degraded" | "Critical";
+}
+
+export interface EndpointDetail extends EndpointSummary {
+  max_latency_ms: number;
+  error_rate_4xx_percent: number;
+  error_rate_5xx_percent: number;
+}
+
+export interface EndpointPerformance {
+  releases: ReleasePerformance[];
+  regions: RegionPerformance[];
+  trend: LatencyTrendPoint[];
 }
 
 export interface ReleasePerformance {
@@ -60,16 +88,34 @@ export interface RegionPerformance {
   availability_percent: number;
 }
 
+export interface ReleaseRegression {
+  release_version: string;
+  previous_release_version: string | null;
+  avg_latency_change_percent: number;
+  p95_latency_change_percent: number;
+  error_rate_change_points: number;
+  is_regression: boolean;
+}
+
 export interface IncidentOut {
   id: string;
   title: string;
   severity: "low" | "medium" | "high" | "critical";
-  status: "open" | "investigating" | "resolved";
+  status: "open" | "acknowledged" | "resolved";
   service: string;
   started_at: string;
   ended_at: string | null;
   trigger_type: string;
   description: string | null;
+}
+
+export interface IncidentContext {
+  current_metrics: {
+    error_rate_percent: number;
+    avg_latency_ms: number;
+    p95_latency_ms: number;
+  };
+  affected_endpoints: string[];
 }
 
 export interface LogEntry {

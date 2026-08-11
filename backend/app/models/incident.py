@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, DateTime, Text
+from sqlalchemy import String, DateTime, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -23,7 +23,7 @@ class Incident(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     # low | medium | high | critical
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
-    # open | investigating | resolved
+    # open | acknowledged | resolved
     status: Mapped[str] = mapped_column(String(20), default="open")
     service: Mapped[str] = mapped_column(String(100), nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
@@ -32,3 +32,17 @@ class Incident(Base):
     trigger_type: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+    __table_args__ = (
+        # Enforced in application logic too (SQLite partial-unique-index
+        # support varies by version), but declared here as the intended
+        # invariant: only one OPEN incident per (service, trigger_type).
+        Index(
+            "ux_incidents_open_service_trigger",
+            "service", "trigger_type", "status",
+            unique=False,
+        ),
+    )

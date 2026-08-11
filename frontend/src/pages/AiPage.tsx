@@ -106,7 +106,7 @@ export default function AiPage() {
                 p: 1.5,
                 maxWidth: "80%",
                 bgcolor: m.role === "user" ? "primary.main" : "grey.100",
-                color: m.role === "user" ? "primary.contrastText" : "black",
+                color: m.role === "user" ? "primary.contrastText" : "inherit",
               }}
             >
               <Typography variant="body2">{m.content}</Typography>

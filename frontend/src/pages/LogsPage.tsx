@@ -14,9 +14,17 @@ import {
   TextField,
   Pagination,
   Chip,
+  Stack,
 } from "@mui/material";
 import { fetchLogs } from "../api/analytics";
 import type { LogEntry } from "../types/api";
+import {
+  formatServiceName,
+  formatEndpointName,
+  formatReleaseName,
+  formatRegionName,
+  formatDateTime,
+} from "../utils/formatting";
 
 const PAGE_SIZE = 25;
 
@@ -26,6 +34,11 @@ export default function LogsPage() {
   const [page, setPage] = useState(1);
   const [service, setService] = useState("");
   const [endpoint, setEndpoint] = useState("");
+  const [status, setStatus] = useState("");
+  const [release, setRelease] = useState("");
+  const [region, setRegion] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +49,11 @@ export default function LogsPage() {
       limit: PAGE_SIZE,
       service: service || undefined,
       endpoint: endpoint || undefined,
+      status: status ? Number(status) : undefined,
+      release: release || undefined,
+      region: region || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
     })
       .then((res) => {
         setLogs(res.logs);
@@ -46,9 +64,30 @@ export default function LogsPage() {
       )
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, service, endpoint]);
+  }, [page, service, endpoint, status, release, region, dateFrom, dateTo]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  function filterField(
+    label: string,
+    value: string,
+    setValue: (v: string) => void,
+    type: "text" | "number" | "date" = "text",
+  ) {
+    return (
+      <TextField
+        label={label}
+        size="small"
+        type={type}
+        value={value}
+        InputLabelProps={type === "date" ? { shrink: true } : undefined}
+        onChange={(e) => {
+          setPage(1);
+          setValue(e.target.value);
+        }}
+      />
+    );
+  }
 
   return (
     <Box>
@@ -56,26 +95,15 @@ export default function LogsPage() {
         Logs
       </Typography>
 
-      <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-        <TextField
-          label="Service"
-          size="small"
-          value={service}
-          onChange={(e) => {
-            setPage(1);
-            setService(e.target.value);
-          }}
-        />
-        <TextField
-          label="Endpoint"
-          size="small"
-          value={endpoint}
-          onChange={(e) => {
-            setPage(1);
-            setEndpoint(e.target.value);
-          }}
-        />
-      </Box>
+      <Stack direction="row" flexWrap="wrap" gap={2} sx={{ mb: 2 }}>
+        {filterField("Service", service, setService)}
+        {filterField("Endpoint", endpoint, setEndpoint)}
+        {filterField("Status", status, setStatus, "number")}
+        {filterField("Release", release, setRelease)}
+        {filterField("Region", region, setRegion)}
+        {filterField("From", dateFrom, setDateFrom, "date")}
+        {filterField("To", dateTo, setDateTo, "date")}
+      </Stack>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -89,7 +117,8 @@ export default function LogsPage() {
         </Box>
       ) : logs.length === 0 ? (
         <Alert severity="info">
-          No logs found — load a dataset from the Overview page first.
+          No logs found — load a dataset from the Overview page first, or clear
+          your filters.
         </Alert>
       ) : (
         <>
@@ -109,11 +138,9 @@ export default function LogsPage() {
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id} hover>
-                    <TableCell>
-                      {new Date(log.timestamp).toLocaleString()}
-                    </TableCell>
-                    <TableCell>{log.service_name}</TableCell>
-                    <TableCell>{log.endpoint}</TableCell>
+                    <TableCell>{formatDateTime(log.timestamp)}</TableCell>
+                    <TableCell>{formatServiceName(log.service_name)}</TableCell>
+                    <TableCell>{formatEndpointName(log.endpoint)}</TableCell>
                     <TableCell>
                       <Chip
                         label={log.status_code}
@@ -124,8 +151,10 @@ export default function LogsPage() {
                     <TableCell align="right">
                       {log.response_time_ms}ms
                     </TableCell>
-                    <TableCell>{log.release_version}</TableCell>
-                    <TableCell>{log.server_region}</TableCell>
+                    <TableCell>
+                      {formatReleaseName(log.release_version)}
+                    </TableCell>
+                    <TableCell>{formatRegionName(log.server_region)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -15,11 +16,13 @@ import {
 import { fetchServices } from "../api/analytics";
 import type { ServiceSummary } from "../types/api";
 import { StatusChip } from "../components/StatusChip";
+import { formatServiceName } from "../utils/formatting";
 
 export default function ServicesPage() {
   const [services, setServices] = useState<ServiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchServices()
@@ -67,8 +70,15 @@ export default function ServicesPage() {
             </TableHead>
             <TableBody>
               {services.map((s) => (
-                <TableRow key={s.service_name} hover>
-                  <TableCell>{s.service_name}</TableCell>
+                <TableRow
+                  key={s.service_name}
+                  hover
+                  onClick={() =>
+                    navigate(`/services/${encodeURIComponent(s.service_name)}`)
+                  }
+                  sx={{ cursor: "pointer" }}
+                >
+                  <TableCell>{formatServiceName(s.service_name)}</TableCell>
                   <TableCell>
                     <StatusChip status={s.status} />
                   </TableCell>

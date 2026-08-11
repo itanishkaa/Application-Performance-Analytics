@@ -37,6 +37,7 @@ import type {
 import { KpiCard } from "../components/KpiCard";
 import { DashboardPanel } from "../components/DashboardPanel";
 import { StatusChip } from "../components/StatusChip";
+import { formatServiceName, formatEndpointName } from "../utils/formatting";
 
 const SEVERITY_DOT: Record<string, string> = {
   low: "#64748b",
@@ -300,7 +301,9 @@ export default function DashboardPage() {
                     justifyContent: "space-between",
                   }}
                 >
-                  <Typography variant="body2">{s.service_name}</Typography>
+                  <Typography variant="body2">
+                    {formatServiceName(s.service_name)}
+                  </Typography>
                   <StatusChip status={s.status} />
                 </Box>
               ))}
@@ -324,7 +327,9 @@ export default function DashboardPage() {
                     justifyContent: "space-between",
                   }}
                 >
-                  <Typography variant="body2">{s.service_name}</Typography>
+                  <Typography variant="body2">
+                    {formatServiceName(s.service_name)}
+                  </Typography>
                   <Typography
                     variant="body2"
                     fontWeight={600}
@@ -370,9 +375,11 @@ export default function DashboardPage() {
                   }}
                 >
                   <Box>
-                    <Typography variant="body2">{e.endpoint}</Typography>
+                    <Typography variant="body2">
+                      {formatEndpointName(e.endpoint)}
+                    </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {e.service_name}
+                      {formatServiceName(e.service_name)}
                     </Typography>
                   </Box>
                   <Typography variant="body2" fontWeight={600}>

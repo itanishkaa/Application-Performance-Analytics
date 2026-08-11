@@ -38,3 +38,13 @@ class AiChatResponse(BaseModel):
     answer: str
     model: str
     context_used: dict
+
+
+class AiServiceAnalyzeRequest(BaseModel):
+    service: str
+
+
+class AiServiceAnalyzeResponse(BaseModel):
+    potential_issues: List[str]
+    recommended_investigation: List[str]
+    model: str

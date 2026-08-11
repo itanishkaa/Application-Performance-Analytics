@@ -9,9 +9,12 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import ServicesPage from "./pages/ServicesPage";
+import ServiceDetailPage from "./pages/ServiceDetailPage";
 import EndpointsPage from "./pages/EndpointsPage";
+import EndpointDetailPage from "./pages/EndpointDetailPage";
 import ReleasesPage from "./pages/ReleasesPage";
 import IncidentsPage from "./pages/IncidentsPage";
+import IncidentDetailPage from "./pages/IncidentDetailPage";
 import LogsPage from "./pages/LogsPage";
 import AiPage from "./pages/AiPage";
 
@@ -50,10 +53,26 @@ export default function App() {
               }
             />
             <Route
+              path="/services/:serviceName"
+              element={
+                <Protected>
+                  <ServiceDetailPage />
+                </Protected>
+              }
+            />
+            <Route
               path="/endpoints"
               element={
                 <Protected>
                   <EndpointsPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/endpoints/:endpointPath"
+              element={
+                <Protected>
+                  <EndpointDetailPage />
                 </Protected>
               }
             />
@@ -70,6 +89,14 @@ export default function App() {
               element={
                 <Protected>
                   <IncidentsPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/incidents/:incidentId"
+              element={
+                <Protected>
+                  <IncidentDetailPage />
                 </Protected>
               }
             />

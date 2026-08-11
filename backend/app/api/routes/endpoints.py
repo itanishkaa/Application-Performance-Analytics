@@ -24,6 +24,28 @@ def list_endpoints(
     result = analytics_service.analyze_endpoint_performance(df)
     return {"endpoints": result.to_dict(orient="records")}
 
+@router.get("/{endpoint_path:path}/performance")
+def get_endpoint_performance(
+    endpoint_path: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Release/region/time breakdown for a single endpoint (PRD section 17)."""
+    df = load_logs_df(db)
+    endpoint_df = df[df["endpoint"] == endpoint_path]
+    if len(endpoint_df) == 0:
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+
+    releases = analytics_service.analyze_release_performance(endpoint_df)
+    regions = analytics_service.analyze_region_performance(endpoint_df)
+    trend = analytics_service.latency_trend(endpoint_df)
+
+    return {
+        "releases": releases.to_dict(orient="records"),
+        "regions": regions.to_dict(orient="records"),
+        "trend": trend.to_dict(orient="records"),
+    }
+
 
 @router.get("/{endpoint_path:path}", response_model=EndpointDetail)
 def get_endpoint(
@@ -55,25 +77,3 @@ def get_endpoint(
         "error_rate_5xx_percent": round(error_5xx, 2),
     }
 
-
-@router.get("/{endpoint_path:path}/performance")
-def get_endpoint_performance(
-    endpoint_path: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Release/region/time breakdown for a single endpoint (PRD section 17)."""
-    df = load_logs_df(db)
-    endpoint_df = df[df["endpoint"] == endpoint_path]
-    if len(endpoint_df) == 0:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
-
-    releases = analytics_service.analyze_release_performance(endpoint_df)
-    regions = analytics_service.analyze_region_performance(endpoint_df)
-    trend = analytics_service.latency_trend(endpoint_df)
-
-    return {
-        "releases": releases.to_dict(orient="records"),
-        "regions": regions.to_dict(orient="records"),
-        "trend": trend.to_dict(orient="records"),
-    }

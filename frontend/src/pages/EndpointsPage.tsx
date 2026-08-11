@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -16,12 +17,13 @@ import {
 import { fetchEndpoints } from "../api/analytics";
 import type { EndpointSummary } from "../types/api";
 import { StatusChip } from "../components/StatusChip";
-
+import { formatEndpointName, formatServiceName } from "../utils/formatting";
 export default function EndpointsPage() {
   const [endpoints, setEndpoints] = useState<EndpointSummary[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchEndpoints()
@@ -85,9 +87,18 @@ export default function EndpointsPage() {
               </TableHead>
               <TableBody>
                 {filtered.map((e) => (
-                  <TableRow key={`${e.service_name}-${e.endpoint}`} hover>
-                    <TableCell>{e.endpoint}</TableCell>
-                    <TableCell>{e.service_name}</TableCell>
+                  <TableRow
+                    key={`${e.service_name}-${e.endpoint}`}
+                    hover
+                    onClick={() =>
+                      navigate(
+                        `/endpoints/${encodeURIComponent(e.endpoint)}?service=${encodeURIComponent(e.service_name)}`,
+                      )
+                    }
+                    sx={{ cursor: "pointer" }}
+                  >
+                    <TableCell>{formatEndpointName(e.endpoint)}</TableCell>
+                    <TableCell>{formatServiceName(e.service_name)}</TableCell>
                     <TableCell align="right">
                       {e.requests.toLocaleString()}
                     </TableCell>

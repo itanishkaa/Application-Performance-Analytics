@@ -10,6 +10,7 @@ class ServiceSummary(BaseModel):
     avg_latency_ms: float
     p95_latency_ms: float
     error_rate_percent: float
+    availability_percent: float
 
 
 class ServiceListResponse(BaseModel):

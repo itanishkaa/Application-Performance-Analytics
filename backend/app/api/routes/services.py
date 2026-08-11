@@ -11,15 +11,26 @@ from app.services.data_access import load_logs_df
 router = APIRouter(prefix="/services", tags=["services"])
 
 
+UNKNOWN_SERVICE_NAME = "unknown-service"
+
+
 def _summarize(df, service_name: str) -> dict:
     service_df = df[df["service_name"] == service_name]
     kpis = analytics_service.calculate_kpis(service_df)
     percentiles = analytics_service.calculate_percentiles(service_df)
-    status = "Healthy"
-    if kpis["error_rate_percent"] > 5 or percentiles["p95"] > 2000:
-        status = "Critical"
-    elif kpis["error_rate_percent"] > 2 or percentiles["p95"] > 1000:
-        status = "Degraded"
+
+    if service_name == UNKNOWN_SERVICE_NAME:
+        # Rows where the source log had no service identifier at all —
+        # these aren't a real application to grade "Critical", so give
+        # them a neutral status rather than folding them into the same
+        # health scale as an actual service.
+        status = "Unknown"
+    else:
+        status = "Healthy"
+        if kpis["error_rate_percent"] > 5 or percentiles["p95"] > 2000:
+            status = "Critical"
+        elif kpis["error_rate_percent"] > 2 or percentiles["p95"] > 1000:
+            status = "Degraded"
 
     return {
         "service_name": service_name,
@@ -28,6 +39,7 @@ def _summarize(df, service_name: str) -> dict:
         "avg_latency_ms": kpis["avg_latency_ms"],
         "p95_latency_ms": kpis["p95_latency_ms"],
         "error_rate_percent": kpis["error_rate_percent"],
+        "availability_percent": kpis["availability_percent"],
     }
 
 
@@ -42,6 +54,28 @@ def list_services(
 
     summaries = [_summarize(df, name) for name in sorted(df["service_name"].unique())]
     return {"services": summaries}
+
+@router.get("/{service_name}/performance")
+def get_service_performance(
+    service_name: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Endpoint- and release-level breakdown for a single service."""
+    df = load_logs_df(db)
+    service_df = df[df["service_name"] == service_name]
+    if len(service_df) == 0:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    endpoints = analytics_service.analyze_endpoint_performance(service_df)
+    releases = analytics_service.analyze_release_performance(service_df)
+    regions = analytics_service.analyze_region_performance(service_df)
+
+    return {
+        "endpoints": endpoints.to_dict(orient="records"),
+        "releases": releases.to_dict(orient="records"),
+        "regions": regions.to_dict(orient="records"),
+    }
 
 
 @router.get("/{service_name}", response_model=ServiceDetail)
@@ -69,25 +103,3 @@ def get_service(
         "error_trend": None,
     }
 
-
-@router.get("/{service_name}/performance")
-def get_service_performance(
-    service_name: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Endpoint- and release-level breakdown for a single service."""
-    df = load_logs_df(db)
-    service_df = df[df["service_name"] == service_name]
-    if len(service_df) == 0:
-        raise HTTPException(status_code=404, detail="Service not found")
-
-    endpoints = analytics_service.analyze_endpoint_performance(service_df)
-    releases = analytics_service.analyze_release_performance(service_df)
-    regions = analytics_service.analyze_region_performance(service_df)
-
-    return {
-        "endpoints": endpoints.to_dict(orient="records"),
-        "releases": releases.to_dict(orient="records"),
-        "regions": regions.to_dict(orient="records"),
-    }
